@@ -4,7 +4,7 @@
 Simple script to create a Fallout76Custom.ini for .ba2 mods installed
 
 ## Rathinosk
-This is a fork of GrimTech's fork this python INI file generator (<a href="https://www.nexusmods.com/fallout76/mods/314" target="_blank">Nexus Link</a>) modified for my own purposes.
+This is a fork of GrimTech's fork of a python INI file generator (Located at this <a href="https://www.nexusmods.com/fallout76/mods/314" target="_blank">Nexus Link</a>) modified for my own purposes.
 
 ## Instructions
   * Make a backup of your current Fallout76Custom.ini if you have one
