@@ -7,29 +7,30 @@ import os
 from os import walk
 import sys
 
-# Set the default home and mod directories
-HOME_DIR = os.path.expanduser("~") + "\\Documents\\My Games\\Fallout 76"
+# Set the default mod directory and INI file path
+MODS_DIR = '.'  # Default to current directory
 FILENAME = 'Fallout76Custom.ini'
+INI_FOLDER = None
+
+# Detect if OneDrive exists and set appropriate paths
+if os.path.exists(os.path.expanduser("~") + "\\OneDrive"):
+    INI_FOLDER = os.path.expanduser("~") + "\\OneDrive\\Documents\\My Games\\Fallout 76"
+else:
+    INI_FOLDER = os.path.expanduser("~") + "\\Documents\\My Games\\Fallout 76"
 
 # Get arguments from the user
-PARSER = argparse.ArgumentParser(description='This program will automatically create the ' + 'Fallout76Custom.ini file for you. In most cases the ' + 'default arguments will be fine.')
-PARSER.add_argument('--datafolder', default='.',
-										help='Specify fallout76\'s data folder location (Default: current directory)')
-PARSER.add_argument('--inifolder', default=HOME_DIR,
-										help='Specify the folder where Fallout76Custom.ini lives' + ' (Default: ' + HOME_DIR + ')')
-PARSER.add_argument('--inifilename', default=FILENAME,
-										help='Specify the filename for the ini (Default: ' + FILENAME + ')')
-PARSER.add_argument('--runasadmin', action="store_true",
-										help='Runs as an admin. Use when Fallout 76' + 'installed in UAC location.')
-PARSER.add_argument('--copyinicontents',
-										help='Copy a file\'s contents into your custom .ini')
-
+PARSER = argparse.ArgumentParser(description='This program will automatically create the Fallout76Custom.ini file for you.')
+PARSER.add_argument('--datafolder', default=MODS_DIR, help='Specify Fallout 76\'s data folder location (Default: current directory)')
+PARSER.add_argument('--inifolder', default=INI_FOLDER, help='Specify the folder where Fallout76Custom.ini should be placed')
+PARSER.add_argument('--inifilename', default=FILENAME, help='Specify the filename for the ini (Default: ' + FILENAME + ')')
+PARSER.add_argument('--runasadmin', action="store_true", help='Run as an admin. Use when Fallout 76 is installed in a UAC location.')
+PARSER.add_argument('--copyinicontents', default='INI_FOLDER', help='Copy a file\'s contents into your custom .ini')
 ARGS = PARSER.parse_args()
 
 # Assign arguments to variables
 MODS_DIR = ARGS.datafolder
 FILENAME = ARGS.inifilename
-HOME_DIR = ARGS.inifolder + "\\" + FILENAME
+INI_FOLDER = ARGS.inifolder
 IS_ADMIN = ARGS.runasadmin
 IMPORT_INI = ARGS.copyinicontents
 
@@ -152,67 +153,70 @@ SR_2LIST_INDEX = 3
 
 # madogs: checks if user set --runasadmin=True
 if IS_ADMIN:
-		# Re-run the program with admin rights
-		ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, __file__, None, 1)
+    # Re-run the program with admin rights
+    ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, __file__, None, 1)
+
 else:
-		# Create any missing folders
-		if not os.path.exists(os.path.dirname(HOME_DIR)):
-				try:
-						os.makedirs(os.path.dirname(HOME_DIR))
-				except OSError as exc: # Guard against race condition
-						if exc.errno != errno.EEXIST:
-								raise
+    # Create any missing folders
+    if not os.path.exists(os.path.dirname(INI_FOLDER)):
+        try:
+            os.makedirs(os.path.dirname(INI_FOLDER))
+        except OSError as exc:
+            if exc.errno != errno.EEXIST:
+                raise
 
-		# Open the Custom.ini file for writing
-		CUSTOM_INI_FILE = open(HOME_DIR, "w+")
 
-		# write the section header to the file
-		CUSTOM_INI_FILE.write("[Archive]\r\n")
+    # Open the Custom.ini file for writing
+    CUSTOM_INI_FILE = open(os.path.join(INI_FOLDER, FILENAME), "w+")
 
-		# Loop through the resource map and add mods to the correct places
-		for (dirpath, dirnames, filenames) in walk(MODS_DIR):
-				for file in filenames:
-						# Make sure the file is not an official file (starts with "SeventySix")
-						# and is a ba2 (file extension)
-						if (file[0:10] != 'SeventySix' and file[-4:].lower() == '.ba2'):
-								FOUND = False
-								for RESOURCE in RESOURCE_MAP:
-										if file in RESOURCE['mods']:
-												RESOURCE['found_mods'].append(file)
-												FOUND = True
 
-								# If a mod doesn't appear in the one of the other mod lists, add it to
-								# the default
-								if not FOUND:
-										RESOURCE_MAP[SR_2LIST_INDEX]['found_mods'].append(file)
-				break
+    # write the section header to the file
+    CUSTOM_INI_FILE.write("[Archive]\r\n")
 
-		# Loop through the resource map and add the correct lines to the ini file
-		for RESOURCE in RESOURCE_MAP:
-				if RESOURCE['found_mods']:
-						# [TODO] Get the array intersection of the `mods` to the found mods
-						# to make a sorted list based on what's in the map
-						FOUND = frozenset(RESOURCE['found_mods'])
-						MODS = RESOURCE['mods']
-						MOD_LIST = [mod for mod in MODS if mod in FOUND]
-						MOD_LIST = ', ' + ', '.join(MOD_LIST)
+    # Loop through the resource map and add mods to the correct places
+    for (dirpath, dirnames, filenames) in walk(MODS_DIR):
+        for file in filenames:
+            # Make sure the file is not an official file (starts with "SeventySix")
+            # and is a ba2 (file extension)
+            if (file[0:10] != 'SeventySix' and file[-4:].lower() == '.ba2'):
+                FOUND = False
+                for RESOURCE in RESOURCE_MAP:
+                    if file in RESOURCE['mods']:
+                            RESOURCE['found_mods'].append(file)
+                            FOUND = True
 
-						# Get any mods that don't show up in the mods list (for the default list)
-						DIFF_LIST = [item for item in FOUND if item not in MODS]
-						if DIFF_LIST:
-								DIFF_LIST.sort()
-								DIFF_LIST = ', ' + ', '.join(DIFF_LIST)
-						else:
-								DIFF_LIST = ''
+                    # If a mod doesn't appear in the one of the other mod lists, add it to
+                    # the default
+                    if not FOUND:
+                            RESOURCE_MAP[SR_2LIST_INDEX]['found_mods'].append(file)
+            break
 
-						# Make the default list a string
-						DEFAULT_MODS = ', '.join(RESOURCE['default_mods'])
+    # Loop through the resource map and add the correct lines to the ini file
+    for RESOURCE in RESOURCE_MAP:
+        if RESOURCE['found_mods']:
+            # [TODO] Get the array intersection of the `mods` to the found mods
+            # to make a sorted list based on what's in the map
+            FOUND = frozenset(RESOURCE['found_mods'])
+            MODS = RESOURCE['mods']
+            MOD_LIST = [mod for mod in MODS if mod in FOUND]
+            MOD_LIST = ', ' + ', '.join(MOD_LIST)
 
-						CUSTOM_INI_FILE.write(RESOURCE['filename'] + " = %s\r\n" % (DEFAULT_MODS + MOD_LIST + DIFF_LIST))
+            # Get any mods that don't show up in the mods list (for the default list)
+            DIFF_LIST = [item for item in FOUND if item not in MODS]
+            if DIFF_LIST:
+                DIFF_LIST.sort()
+                DIFF_LIST = ', ' + ', '.join(DIFF_LIST)
+            else:
+                    DIFF_LIST = ''
 
-		# Copy contents of a custom file in to the custom.ini
-		if IMPORT_INI:
-				IMPORT_FILE = open(IMPORT_INI, "r")
-				CUSTOM_INI_FILE.write(IMPORT_FILE.read())
+            # Make the default list a string
+            DEFAULT_MODS = ', '.join(RESOURCE['default_mods'])
 
-		CUSTOM_INI_FILE.close()
+            CUSTOM_INI_FILE.write(RESOURCE['filename'] + " = %s\r\n" % (DEFAULT_MODS + MOD_LIST + DIFF_LIST))
+
+    # Copy contents of a custom file in to the custom.ini
+    if IMPORT_INI:
+        IMPORT_FILE = open(IMPORT_INI, "r")
+        CUSTOM_INI_FILE.write(IMPORT_FILE.read())
+
+    CUSTOM_INI_FILE.close()
