@@ -178,18 +178,18 @@ else:
         for file in filenames:
             # Make sure the file is not an official file (starts with "SeventySix")
             # and is a ba2 (file extension)
-            if (file[0:10] != 'SeventySix' and file[-4:].lower() == '.ba2'):
+            if (file[:10] != 'SeventySix' and file[-4:].lower() == '.ba2'):
                 FOUND = False
                 for RESOURCE in RESOURCE_MAP:
                     if file in RESOURCE['mods']:
-                            RESOURCE['found_mods'].append(file)
-                            FOUND = True
+                        RESOURCE['found_mods'].append(file)
+                        FOUND = True
+                        break  # Exit the loop after finding a match
 
-                    # If a mod doesn't appear in the one of the other mod lists, add it to
-                    # the default
-                    if not FOUND:
-                            RESOURCE_MAP[SR_2LIST_INDEX]['found_mods'].append(file)
-            break
+                # If a mod doesn't appear in any other mod lists, add it to the default
+                if not FOUND:
+                    RESOURCE_MAP[SR_2LIST_INDEX]['found_mods'].append(file)
+
 
     # Loop through the resource map and add the correct lines to the ini file
     for RESOURCE in RESOURCE_MAP:
