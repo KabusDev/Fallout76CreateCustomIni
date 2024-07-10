@@ -1,222 +1,94 @@
-""" This module creates a fallout76Custom.ini file from the installed mods in the data directory """
+""" This module creates a Fallout76Custom.ini file from the installed mods in the data directory """
 
 import argparse
 import ctypes
-import errno
+import json
 import os
-from os import walk
 import sys
+from configparser import ConfigParser
+from os import walk
 
-# Set the default mod directory and INI file path
-MODS_DIR = '.'  # Default to current directory
+# Default paths and filenames
+MODS_DIR = '.'
 FILENAME = 'Fallout76Custom.ini'
-INI_FOLDER = None
+INI_FOLDER = os.path.expanduser("~") + ("\\OneDrive\\Documents\\My Games\\Fallout 76" if os.path.exists(os.path.expanduser("~") + "\\OneDrive") else "\\Documents\\My Games\\Fallout 76")
 
-# Detect if OneDrive exists and set appropriate paths
-if os.path.exists(os.path.expanduser("~") + "\\OneDrive"):
-    INI_FOLDER = os.path.expanduser("~") + "\\OneDrive\\Documents\\My Games\\Fallout 76"
-else:
-    INI_FOLDER = os.path.expanduser("~") + "\\Documents\\My Games\\Fallout 76"
-
-# Get arguments from the user
-PARSER = argparse.ArgumentParser(description='This program will automatically create the Fallout76Custom.ini file for you.')
-PARSER.add_argument('--datafolder', default=MODS_DIR, help='Specify Fallout 76\'s data folder location (Default: current directory)')
-PARSER.add_argument('--inifolder', default=INI_FOLDER, help='Specify the folder where Fallout76Custom.ini should be placed')
-PARSER.add_argument('--inifilename', default=FILENAME, help='Specify the filename for the ini (Default: ' + FILENAME + ')')
-PARSER.add_argument('--runasadmin', action="store_true", help='Run as an admin. Use when Fallout 76 is installed in a UAC location.')
-PARSER.add_argument('--copyinicontents', default='INI_FOLDER', help='Copy a file\'s contents into your custom .ini')
-ARGS = PARSER.parse_args()
+# Command-line argument parsing
+parser = argparse.ArgumentParser(description='Automatically create the Fallout76Custom.ini file for you.')
+parser.add_argument('--datafolder', default=MODS_DIR, help='Specify Fallout 76\'s data folder location (default: current directory)')
+parser.add_argument('--inifolder', default=INI_FOLDER, help='Specify the folder where Fallout76Custom.ini should be placed')
+parser.add_argument('--inifilename', default=FILENAME, help='Specify the filename for the INI (default: Fallout76Custom.ini)')
+parser.add_argument('--runasadmin', action="store_true", help='Run as an admin. Use when Fallout 76 is installed in a UAC location.')
+parser.add_argument('--configfile', default='resource_map.json', help='Specify the JSON config file for RESOURCE_MAP')
+args = parser.parse_args()
 
 # Assign arguments to variables
-MODS_DIR = ARGS.datafolder
-FILENAME = ARGS.inifilename
-INI_FOLDER = ARGS.inifolder
-IS_ADMIN = ARGS.runasadmin
-IMPORT_INI = ARGS.copyinicontents
+MODS_DIR = args.datafolder
+FILENAME = args.inifilename
+INI_FOLDER = args.inifolder
+IS_ADMIN = args.runasadmin
+CONFIG_FILE = args.configfile
 
-# Configuration arrays, these are mods that should go in specific
-# lists, all other go in sResourceArchive2List
-RESOURCE_MAP = [{
-	'filename': 'sResourceStartUpArchiveList',
-		'mods': [
-            'BakaFile - Main.ba2',
-			'IconTag.ba2',
-			'IconSortingRatmonkeys.ba2',
-			'MMM - Country Roads.ba2'
-            ],
-		'default_mods': [
-            'SeventySix - Interface.ba2',
-			'SeventySix - Localization.ba2',
-			'SeventySix - Shaders.ba2',
-			'SeventySix - Startup.ba2'
-            ],
-		'found_mods': []
-	},
-	{
-	'filename': 'sResourceArchiveList2',
-		'mods': [
-            'ShowHealth.ba2',
-			'MoreWhereThatCameFrom.ba2',
-			'Prismatic_Lasers_76_Lightblue.ba2',
-			'OptimizedSonar.ba2',
-			'Silentchameleon.ba2',
-			'CleanPip.ba2',
-			'classicFOmus_76.ba2',
-			'nootnoot.ba2',
-			'MenuMusicReplacer.ba2',
-			'BullBarrel.ba2',
-			'EVB76 - Meshes.ba2',
-			'EVB76 - Textures.ba2',
-			'BoxerShorts.ba2',
-			'MaleUnderwear.ba2',
-			'FemaleUnderwear.ba2',
-            ],
-		'default_mods': [
-            'SeventySix - Animations.ba2',
-			'SeventySix - EnlightenInteriors.ba2',
-			'SeventySix - GeneratedTextures.ba2',
-			'SeventySix - EnlightenExteriors01.ba2',
-			'SeventySix - EnlightenExteriors02.ba2'
-            ],
-		'found_mods': []
-	},
-	{
-	'filename': 'sResourceIndexFileList',
-		'mods': [
-            'UHDmap.ba2',
-			'EnhancedBlood - Textures.ba2',
-			'EnhancedBlood - Meshes.ba2',
-			'MapMarkers.ba2',
-			'Radiant_Clouds.ba2',
-			'SpoilerFreeMap.ba2',
-            ],
-		'default_mods': [
-            'SeventySix - Textures01.ba2',
-			'SeventySix - Textures02.ba2',
-			'SeventySix - Textures03.ba2',
-			'SeventySix - Textures04.ba2',
-			'SeventySix - Textures05.ba2',
-			'SeventySix - Textures06.ba2'
-            ],
-		'found_mods': []
-	},
-	{
-	'filename': 'sResourceArchive2List',
-		'mods': [
-            'ChatMod.ba2'
-            ],
-		'default_mods': [
-            'SeventySix - 00UpdateMain.ba2',
-			'SeventySix - 01UpdateMain.ba2',
-			'SeventySix - 00UpdateStream.ba2',
-			'SeventySix - 01UpdateStream.ba2',
-			'SeventySix - 00UpdateTextures.ba2',
-			'SeventySix - 01UpdateTextures.ba2',
-			'SeventySix - MeshesExtra.ba2',
-			'SeventySix - 02UpdateMain.ba2',
-			'SeventySix - 03UpdateMain.ba2',
-			'SeventySix - 04UpdateMain.ba2',
-			'SeventySix - 02UpdateStream.ba2',
-			'SeventySix - 03UpdateStream.ba2',
-			'SeventySix - 04UpdateStream.ba2',
-			'SeventySix - 02UpdateTextures.ba2',
-			'SeventySix - 03UpdateTextures.ba2',
-			'SeventySix - 04UpdateTextures.ba2',
-			'SeventySix - GeneratedMeshes.ba2',
-			'SeventySix - StaticMeshes.ba2',
-			'SeventySix - 05UpdateMain.ba2',
-			'SeventySix - 06UpdateMain.ba2',
-			'SeventySix - 05UpdateStream.ba2',
-			'SeventySix - 05UpdateTextures.ba2',
-			'SeventySix - 06UpdateTextures.ba2'
-            ],
-		'found_mods': []
-	},
-	{
-	'filename': 'sResourceArchiveMisc',
-		'mods': [
-            'PerkLoadoutManager.ba2',
-			'BetterInventory.ba2',
-			'LockpickBar.ba2',
-			'Quizzless Apalachia.ba2',
-			'okas_improved_markers.ba2'
-            ],
-		'default_mods': [
-            'SeventySix - MiscClient.ba2'
-            ],
-		'found_mods': []
-	}
-]
+# Load the RESOURCE_MAP from the JSON file
+with open(CONFIG_FILE, 'r') as file:
+    RESOURCE_MAP = json.load(file)
 
-#The array index from the RESOURCE_MAP for sResourceArchive2List
 SR_2LIST_INDEX = 3
 
-# madogs: checks if user set --runasadmin=True
+def update_archive_section(ini_path, resource_map):
+    config = ConfigParser()
+    config.optionxform = str  # Preserve case sensitivity
+    config.read(ini_path)
+
+    # Ensure [Archive] section exists
+    if 'Archive' not in config.sections():
+        config.add_section('Archive')
+
+    # Clear found_mods before populating it
+    for RESOURCE in resource_map:
+        RESOURCE['found_mods'].clear()
+
+    # Loop through the resource map and add mods to the correct places
+    for _, _, filenames in walk(MODS_DIR):
+        for file in filenames:
+            if file[:10] != 'SeventySix' and file[-4:].lower() == '.ba2':
+                found = False
+                for RESOURCE in resource_map:
+                    if file in RESOURCE['mods']:
+                        if file not in RESOURCE['found_mods']:
+                            RESOURCE['found_mods'].append(file)
+                        found = True
+                        break
+                if not found:
+                    resource_map[SR_2LIST_INDEX]['found_mods'].append(file)
+
+    # Update the [Archive] section in the config
+    for RESOURCE in resource_map:
+        if RESOURCE['found_mods']:
+            found = frozenset(RESOURCE['found_mods'])
+            mod_list = ', '.join(mod for mod in RESOURCE['mods'] if mod in found)
+            diff_list = ', '.join(item for item in found if item not in RESOURCE['mods'])
+            default_mods = ', '.join(RESOURCE['default_mods'])
+
+            full_list = ', '.join(filter(None, [default_mods, mod_list, diff_list]))
+
+            if RESOURCE['filename'] == 'sResourceArchive2List' and 'ChatMod.ba2' not in full_list:
+                full_list = ', '.join(filter(None, [full_list, 'ChatMod.ba2']))
+
+            config.set('Archive', RESOURCE['filename'], full_list)
+
+    with open(ini_path, 'w') as configfile:
+        config.write(configfile)
+
 if IS_ADMIN:
     # Re-run the program with admin rights
     ctypes.windll.shell32.ShellExecuteW(None, "runas", sys.executable, __file__, None, 1)
-
 else:
     # Create any missing folders
-    if not os.path.exists(os.path.dirname(INI_FOLDER)):
-        try:
-            os.makedirs(os.path.dirname(INI_FOLDER))
-        except OSError as exc:
-            if exc.errno != errno.EEXIST:
-                raise
+    if not os.path.exists(INI_FOLDER):
+        os.makedirs(INI_FOLDER)
 
+    ini_path = os.path.join(INI_FOLDER, FILENAME)
 
-    # Open the Custom.ini file for writing
-    CUSTOM_INI_FILE = open(os.path.join(INI_FOLDER, FILENAME), "w+")
-
-
-    # write the section header to the file
-    CUSTOM_INI_FILE.write("[Archive]\r\n")
-
-    # Loop through the resource map and add mods to the correct places
-    for (dirpath, dirnames, filenames) in walk(MODS_DIR):
-        for file in filenames:
-            # Make sure the file is not an official file (starts with "SeventySix")
-            # and is a ba2 (file extension)
-            if (file[:10] != 'SeventySix' and file[-4:].lower() == '.ba2'):
-                FOUND = False
-                for RESOURCE in RESOURCE_MAP:
-                    if file in RESOURCE['mods']:
-                        RESOURCE['found_mods'].append(file)
-                        FOUND = True
-                        break  # Exit the loop after finding a match
-
-                # If a mod doesn't appear in any other mod lists, add it to the default
-                if not FOUND:
-                    RESOURCE_MAP[SR_2LIST_INDEX]['found_mods'].append(file)
-
-
-    # Loop through the resource map and add the correct lines to the ini file
-    for RESOURCE in RESOURCE_MAP:
-        if RESOURCE['found_mods']:
-            # [TODO] Get the array intersection of the `mods` to the found mods
-            # to make a sorted list based on what's in the map
-            FOUND = frozenset(RESOURCE['found_mods'])
-            MODS = RESOURCE['mods']
-            MOD_LIST = [mod for mod in MODS if mod in FOUND]
-            MOD_LIST = ', ' + ', '.join(MOD_LIST)
-
-            # Get any mods that don't show up in the mods list (for the default list)
-            DIFF_LIST = [item for item in FOUND if item not in MODS]
-            if DIFF_LIST:
-                DIFF_LIST.sort()
-                DIFF_LIST = ', ' + ', '.join(DIFF_LIST)
-            else:
-                    DIFF_LIST = ''
-
-            # Make the default list a string
-            DEFAULT_MODS = ', '.join(RESOURCE['default_mods'])
-
-            CUSTOM_INI_FILE.write(RESOURCE['filename'] + " = %s\r\n" % (DEFAULT_MODS + MOD_LIST + DIFF_LIST))
-
-    # Copy contents of a custom file in to the custom.ini
-    if IMPORT_INI:
-        IMPORT_FILE = open(IMPORT_INI, "r")
-        CUSTOM_INI_FILE.write(IMPORT_FILE.read())
-
-    CUSTOM_INI_FILE.close()
+    # Update the [Archive] section of the INI file
+    update_archive_section(ini_path, RESOURCE_MAP)
