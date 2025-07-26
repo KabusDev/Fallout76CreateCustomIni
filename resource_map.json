@@ -33,6 +33,8 @@
             "BoxerShorts.ba2",
             "MaleUnderwear.ba2",
             "FemaleUnderwear.ba2",
+			"VATSPriority.ba2",
+			"HUDModLoader.ba2", 
             "ChatMod.ba2"
         ],
         "default_mods": [
