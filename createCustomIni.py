@@ -36,22 +36,26 @@ with open(CONFIG_FILE, 'r') as file:
 SR_2LIST_INDEX = 3
 
 def update_archive_section(ini_path, resource_map):
-    config = ConfigParser()
-    config.optionxform = str  # Preserve case sensitivity
-    config.read(ini_path)
+    # Read original lines
+    original_lines = []
+    if os.path.exists(ini_path):
+        with open(ini_path, 'r', encoding='utf-8') as f:
+            original_lines = f.readlines()
 
-    # Ensure [Archive] section exists
+    # Use ConfigParser to get existing structure for easier updating
+    config = ConfigParser()
+    config.optionxform = str
+    config.read(ini_path, encoding='utf-8')
+
     if 'Archive' not in config.sections():
         config.add_section('Archive')
 
-    # Clear found_mods before populating it
     for RESOURCE in resource_map:
         RESOURCE['found_mods'].clear()
 
-    # Loop through the resource map and add mods to the correct places
     for _, _, filenames in walk(MODS_DIR):
         for file in filenames:
-            if file[:10] != 'SeventySix' and file[-4:].lower() == '.ba2':
+            if file[:10] != 'SeventySix' and file.lower().endswith('.ba2'):
                 found = False
                 for RESOURCE in resource_map:
                     if file in RESOURCE['mods']:
@@ -62,12 +66,11 @@ def update_archive_section(ini_path, resource_map):
                 if not found:
                     resource_map[SR_2LIST_INDEX]['found_mods'].append(file)
 
-    # Update the [Archive] section in the config
     for RESOURCE in resource_map:
         if RESOURCE['found_mods']:
             found = frozenset(RESOURCE['found_mods'])
-            mod_list = ', '.join(mod for mod in RESOURCE['mods'] if mod in found)
-            diff_list = ', '.join(item for item in found if item not in RESOURCE['mods'])
+            mod_list = ', '.join(m for m in RESOURCE['mods'] if m in found)
+            diff_list = ', '.join(i for i in found if i not in RESOURCE['mods'])
             default_mods = ', '.join(RESOURCE['default_mods'])
 
             full_list = ', '.join(filter(None, [default_mods, mod_list, diff_list]))
@@ -77,8 +80,50 @@ def update_archive_section(ini_path, resource_map):
 
             config.set('Archive', RESOURCE['filename'], full_list)
 
-    with open(ini_path, 'w') as configfile:
-        config.write(configfile)
+    # Merge new archive values into original lines
+    archive_section = False
+    output_lines = []
+    for line in original_lines:
+        stripped = line.strip()
+        if stripped.startswith("[Archive]"):
+            archive_section = True
+            output_lines.append(line)
+            continue
+        if archive_section:
+            if stripped.startswith("[") and stripped.endswith("]") and stripped != "[Archive]":
+                archive_section = False
+        if archive_section and "=" in line:
+            key = line.split("=", 1)[0].strip()
+            if key in config["Archive"]:
+                line = f"{key} = {config['Archive'][key]}\n"
+        output_lines.append(line)
+
+    # If for some reason we don't have anythign in the archive section fo the ini??
+    if '[Archive]' in ''.join(output_lines):
+        archive_start = next(i for i, line in enumerate(output_lines) if line.strip() == '[Archive]')
+        existing_keys = set()
+        for i in range(archive_start + 1, len(output_lines)):
+            stripped = output_lines[i].strip()
+            if stripped.startswith('[') and stripped.endswith(']'):
+                break
+            if '=' in stripped:
+                existing_keys.add(stripped.split('=', 1)[0].strip())
+
+        insert_pos = archive_start + 1
+        for key, value in config['Archive'].items():
+            if key not in existing_keys:
+                output_lines.insert(insert_pos, f"{key} = {value}\n")
+                insert_pos += 1
+
+    # If Archive section was missing entirely, append it
+    if '[Archive]' not in ''.join(original_lines):
+        output_lines.append('[Archive]\n')
+        for key, value in config['Archive'].items():
+            output_lines.append(f"{key} = {value}\n")
+
+    with open(ini_path, 'w', encoding='utf-8') as f:
+        f.writelines(output_lines)
+
 
 if IS_ADMIN:
     # Re-run the program with admin rights
